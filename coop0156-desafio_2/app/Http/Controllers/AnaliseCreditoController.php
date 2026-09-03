@@ -3,9 +3,17 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use App\Enums\StatusAnalise;
+use App\Http\Requests\SolicitarAnaliseRequest;
+use App\Jobs\ProcessarContratacaoJob;
+use App\Models\AnaliseCredito;
+use App\Services\AnaliseCreditoService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Response;
 
 class AnaliseCreditoController extends Controller
 {
+    public function __construct(private readonly AnaliseCreditoService $analises) {}
     /**
      * Solicita uma nova análise de crédito.
      *
@@ -29,10 +37,12 @@ class AnaliseCreditoController extends Controller
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\JsonResponse
      */
-    public function solicitar(Request $request)
+    public function solicitar(SolicitarAnaliseRequest $request): JsonResponse
     {
         // TODO: Implementar validação, consulta ao Bureau e regras de análise.
-        return response()->json(['message' => 'Not implemented'], 501);
+        $analise = $this->analises->solicitar($request->validated());
+
+        return response()->json($analise, Response::HTTP_CREATED);
     }
 
     /**
@@ -53,9 +63,24 @@ class AnaliseCreditoController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\JsonResponse
      */
-    public function contratar($id)
+    public function contratar($id): JsonResponse
     {
-        // TODO: Implementar validação da análise e confirmação da contratação.
-        return response()->json(['message' => 'Not implemented'], 501);
+        $analise = AnaliseCredito::findOrFail($id);
+
+        if ($analise->status !== StatusAnalise::APROVADO) {
+            return response()->json([
+                'message' => 'Somente análises aprovadas podem ser contratadas.',
+                'status' => $analise->status,
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $analise->update(['status' => StatusAnalise::PROCESSANDO_CONTRATACAO]);
+
+        ProcessarContratacaoJob::dispatch($analise->id);
+
+        return response()->json([
+            'message' => 'Contratação enviada para processamento.',
+            'analise' => $analise->fresh(),
+        ]);
     }
 }
