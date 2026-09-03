@@ -204,8 +204,8 @@
                 </svg>
             </div>
             <h3 class="text-2xl font-bold text-white mb-2">Contratação Realizada!</h3>
-            <p class="text-slate-400 text-sm mb-6">O crédito foi contratado com sucesso. Você receberá uma confirmação em breve.</p>
-            <div class="bg-emerald-500/5 border border-emerald-500/10 rounded-xl p-3 mb-6 text-xs text-emerald-400 font-mono">
+            <p id="modal-mensagem" class="text-slate-400 text-sm mb-6">O crédito foi contratado com sucesso. Você receberá uma confirmação em breve.</p>
+            <div id="modal-status" class="bg-emerald-500/5 border border-emerald-500/10 rounded-xl p-3 mb-6 text-xs text-emerald-400 font-mono">
                 Status: CONTRATADO
             </div>
             <a href="/" class="inline-block px-8 py-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 rounded-xl text-sm font-medium transition-all">
@@ -219,21 +219,64 @@
         <p>&copy; 2026 Coop0156. Desafio Técnico Laravel.</p>
     </footer>
 
-    <!--
-      -- =========================================================================
-      -- INSTRUÇÕES (CANDIDATO): Implemente o JavaScript abaixo.
-      -- =========================================================================
-      -- Ao clicar em "Confirmar Contratação", o candidato deve:
-      --   1. Mostrar o spinner e desabilitar o botão para evitar clique duplo.
-      --   2. Fazer requisição POST para '/api/analise-credito/{{ $analise->id }}/contratar'.
-      --   3. Em caso de sucesso (HTTP 200), exibir o modal de sucesso (#modal-sucesso).
-      --   4. Em caso de erro, exibir uma mensagem de feedback adequada para o usuário.
-      -->
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            const btnConfirmar = document.getElementById('btn-confirmar');
+            const el = (id) => document.getElementById(id);
 
-            // TODO: Implementar o clique do botão de confirmação.
+            const analiseId = @json($analise->id);
+            const btnConfirmar = el('btn-confirmar');
+            const txtConfirmar = el('txt-confirmar');
+            const spinner = el('spinner-confirmar');
+            const modal = el('modal-sucesso');
+
+            const processando = (ativo) => {
+                btnConfirmar.disabled = ativo;
+                btnConfirmar.classList.toggle('opacity-60', ativo);
+                btnConfirmar.classList.toggle('cursor-not-allowed', ativo);
+                spinner.classList.toggle('hidden', !ativo);
+                txtConfirmar.textContent = ativo ? 'Processando...' : 'Confirmar Contratação';
+            };
+
+            const alerta = (mensagem) => {
+                let box = el('alerta-erro');
+                if (!box) {
+                    box = document.createElement('div');
+                    box.id = 'alerta-erro';
+                    box.className = 'bg-red-500/10 border border-red-500/20 rounded-xl p-4 mb-6 text-red-400 text-sm';
+                    btnConfirmar.closest('.glass-panel').prepend(box);
+                }
+                box.textContent = mensagem;
+                box.classList.remove('hidden');
+            };
+
+            btnConfirmar.addEventListener('click', async () => {
+                el('alerta-erro')?.classList.add('hidden');
+                processando(true);
+
+                try {
+                    const resposta = await fetch(`/api/analise-credito/${analiseId}/contratar`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                    });
+
+                    const dados = await resposta.json();
+
+                    if (!resposta.ok) {
+                        alerta(dados.message || 'Não foi possível confirmar a contratação.');
+                        return;
+                    }
+
+                    const status = dados.analise?.status ?? 'processando_contratacao';
+                    el('modal-status').textContent = `Status: ${status.toUpperCase()}`;
+                    el('modal-mensagem').textContent = dados.message
+                        ?? 'A contratação foi registrada com sucesso.';
+                    modal.classList.remove('hidden');
+                } catch (erro) {
+                    alerta('Falha de comunicação com o servidor. Tente novamente.');
+                } finally {
+                    processando(false);
+                }
+            });
         });
     </script>
 

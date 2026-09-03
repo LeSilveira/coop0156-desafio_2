@@ -144,7 +144,13 @@
 
         <!-- Resultados e Contratação -->
         <section class="lg:col-span-5 space-y-6">
-            
+
+            @if(session('erro'))
+                <div class="glass-panel rounded-2xl p-4 border border-red-500/30 text-red-300 text-sm">
+                    {{ session('erro') }}
+                </div>
+            @endif
+
             <!-- Card de Resultado Inicial (Placeholder) -->
             <div id="resultado-vazio" class="glass-panel rounded-3xl p-8 text-center border-dashed border-2 border-panelBorder flex flex-col items-center justify-center py-20">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-slate-600 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -251,25 +257,144 @@
         </div>
     </footer>
 
-    <!--
-      -- =========================================================================
-      -- INSTRUÇÕES DE IMPLEMENTAÇÃO JAVASCRIPT (DESAFIO PARA O CANDIDATO)
-      -- =========================================================================
-      -- O candidato deve escrever o JavaScript abaixo para integrar com as APIs.
-      -- Requisitos:
-      --   1. Tratar a submissão do formulário 'form-analise'.
-      --   2. Fazer requisição POST para '/api/analise-credito' com os dados do form.
-      --   3. Se REPROVADO: exibir o card de resultado com o motivo da recusa.
-      --   4. Se APROVADO: exibir o card de resultado e um botão/link que redirecione
-      --      o usuário para '/simulacao/{id}' para visualizar as condições antes de contratar.
-      -->
     <script>
+        // Integração com POST /api/analise-credito. Se aprovado, o usuário é
+        // direcionado para /simulacao/{id} para revisar as condições e contratar.
         document.addEventListener('DOMContentLoaded', () => {
-            // O candidato deve preencher a integração aqui.
+            const el = (id) => document.getElementById(id);
 
-            const form = document.getElementById('form-analise');
+            const form = el('form-analise');
+            const btnSolicitar = el('btn-solicitar');
+            const txtSolicitar = el('txt-solicitar');
+            const spinner = el('loading-spinner');
+            const inputCpf = el('cpf');
 
-            // TODO: Adicionar Event Listeners e requisições para a API Laravel.
+            const digitos = (valor) => (valor || '').replace(/\D/g, '');
+
+            const moeda = (valor) => Number(valor).toLocaleString('pt-BR', {
+                style: 'currency',
+                currency: 'BRL',
+            });
+
+            const mascaraCpf = (valor) => {
+                const d = digitos(valor).slice(0, 11);
+                if (d.length > 9) return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
+                if (d.length > 6) return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6)}`;
+                if (d.length > 3) return `${d.slice(0, 3)}.${d.slice(3)}`;
+                return d;
+            };
+
+            inputCpf.addEventListener('input', () => {
+                inputCpf.value = mascaraCpf(inputCpf.value);
+            });
+
+            const carregando = (ativo) => {
+                btnSolicitar.disabled = ativo;
+                btnSolicitar.classList.toggle('opacity-60', ativo);
+                btnSolicitar.classList.toggle('cursor-not-allowed', ativo);
+                spinner.classList.toggle('hidden', !ativo);
+                txtSolicitar.textContent = ativo ? 'Consultando Bureau...' : 'Solicitar Análise de Crédito';
+            };
+
+            const alerta = (mensagem) => {
+                let box = el('alerta-erro');
+                if (!box) {
+                    box = document.createElement('div');
+                    box.id = 'alerta-erro';
+                    box.className = 'glass-panel rounded-2xl p-4 border border-red-500/30 text-red-300 text-sm';
+                    el('resultado-analise').parentNode.prepend(box);
+                }
+                box.textContent = mensagem;
+                box.classList.remove('hidden');
+            };
+
+            const limparAlerta = () => el('alerta-erro')?.classList.add('hidden');
+
+            const badge = (aprovado) => {
+                const cor = aprovado
+                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                    : 'bg-red-500/10 text-red-400 border-red-500/20';
+
+                return `<span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border ${cor}">
+                            ${aprovado ? 'Aprovado' : 'Reprovado'}
+                        </span>`;
+            };
+
+            const exibirResultado = (analise) => {
+                const aprovado = analise.status === 'aprovado';
+
+                el('resultado-vazio').classList.add('hidden');
+                el('resultado-analise').classList.remove('hidden');
+
+                el('res-nome').textContent = analise.nome;
+                el('res-cpf').textContent = mascaraCpf(analise.cpf);
+                el('res-score').textContent = analise.score ?? '-';
+                el('res-status').textContent = aprovado ? 'Aprovado' : 'Reprovado';
+                el('res-status').className = `font-bold ${aprovado ? 'text-emerald-400' : 'text-red-400'}`;
+                el('status-indicator-badge').innerHTML = badge(aprovado);
+
+                el('dados-aprovado').classList.toggle('hidden', !aprovado);
+                el('dados-reprovado').classList.toggle('hidden', aprovado);
+                el('container-contratacao').classList.toggle('hidden', !aprovado);
+
+                if (aprovado) {
+                    const parcela = Number(analise.valor_parcela);
+                    const comprometimento = (parcela / Number(analise.renda_mensal)) * 100;
+
+                    el('res-taxa').textContent = `${Number(analise.taxa_juros).toLocaleString('pt-BR', { minimumFractionDigits: 1 })}% a.m.`;
+                    el('res-parcela').textContent = `12x ${moeda(parcela)}`;
+                    el('res-comprometimento').textContent = `${comprometimento.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`;
+
+                    el('txt-contratar').textContent = 'Ver Simulação e Contratar';
+                    document.querySelector('#container-contratacao p').textContent =
+                        'Você será direcionado para a simulação completa antes de confirmar a contratação.';
+                    el('btn-contratar').onclick = () => {
+                        window.location.href = `/simulacao/${analise.id}`;
+                    };
+                } else {
+                    el('res-motivo').textContent = analise.motivo_rejeicao || 'Não informado';
+                }
+
+                el('resultado-analise').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            };
+
+            form.addEventListener('submit', async (evento) => {
+                evento.preventDefault();
+                limparAlerta();
+                carregando(true);
+
+                try {
+                    const resposta = await fetch('/api/analise-credito', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                        body: JSON.stringify({
+                            nome: el('nome').value.trim(),
+                            cpf: digitos(inputCpf.value),
+                            renda_mensal: el('renda_mensal').value,
+                            tipo_credito: el('tipo_credito').value,
+                            valor_solicitado: el('valor_solicitado').value,
+                        }),
+                    });
+
+                    const dados = await resposta.json();
+
+                    if (resposta.status === 422) {
+                        alerta(Object.values(dados.errors ?? {}).flat().join(' ') || dados.message);
+                        return;
+                    }
+
+                    if (!resposta.ok) {
+                        alerta(dados.message || 'Não foi possível concluir a análise. Tente novamente.');
+                        return;
+                    }
+
+                    exibirResultado(dados);
+                } catch (erro) {
+                    alerta('Falha de comunicação com o servidor. Verifique sua conexão e tente novamente.');
+                } finally {
+                    carregando(false);
+                }
+            });
         });
     </script>
 </body>
