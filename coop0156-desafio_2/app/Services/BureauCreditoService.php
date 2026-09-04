@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Exceptions\BureauIndisponivelException;
-use Exception;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -45,6 +44,6 @@ class BureauCreditoService
             'motivo' => $motivo,
         ]);
 
-        throw new Exception($mensagem);
+        throw new BureauIndisponivelException($mensagem);
     }
 }

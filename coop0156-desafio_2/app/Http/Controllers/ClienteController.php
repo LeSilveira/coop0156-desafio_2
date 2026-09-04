@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use App\Models\Cliente;
-use Illuminate\Http\Response;
 use App\Http\Requests\StoreClienteRequest;
 use App\Http\Requests\UpdateClienteRequest;
+use App\Models\Cliente;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Response;
 
 class ClienteController extends Controller
 {
@@ -17,10 +17,11 @@ class ClienteController extends Controller
      *
      * @return \Illuminate\Http\JsonResponse
      */
-    public function index()
+    public function index(): JsonResponse
     {
-        // TODO: Retornar a lista paginada de clientes.
-        return response()->json(Cliente::latest()->paginate(15));
+        return response()->json(
+            Cliente::latest()->paginate(15)
+        );
     }
 
     /**
@@ -38,25 +39,15 @@ class ClienteController extends Controller
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\JsonResponse
      */
-    public function store(StoreClienteRequest $request)
+    public function store(StoreClienteRequest $request): JsonResponse
     {
-        // TODO: Validar os dados de entrada e persistir o cliente no banco.
         $cliente = Cliente::create($request->validated());
+
         return response()->json($cliente, Response::HTTP_CREATED);
     }
 
-    /**
-     * Exibe os dados de um cliente específico.
-     *
-     * GET /api/clientes/{id}
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\JsonResponse
-     */
-    public function show($id)
+    public function show(Cliente $cliente): JsonResponse
     {
-        // TODO: Buscar e retornar o cliente pelo ID (retornar 404 se não encontrado).
-        $cliente = Cliente::findOrFail($id);
         return response()->json($cliente);
     }
 
@@ -69,12 +60,11 @@ class ClienteController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\JsonResponse
      */
-    public function update(UpdateClienteRequest $request, $id)
+    public function update(UpdateClienteRequest $request, Cliente $cliente): JsonResponse
     {
-        // TODO: Validar os dados e atualizar o cliente (retornar 404 se não encontrado).
-        $cliente = Cliente::findOrFail($id);
         $cliente->update($request->validated());
-        return response()->json(['message' => 'Not implemented'], 501);
+
+        return response()->json($cliente);
     }
 
     /**
@@ -85,11 +75,10 @@ class ClienteController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\JsonResponse
      */
-    public function destroy($id)
+    public function destroy(Cliente $cliente): Response
     {
-        // TODO: Remover o cliente (retornar 404 se não encontrado, 204 No Content se removido).
-        $cliente = Cliente::findOrFail($id);
         $cliente->delete();
+
         return response()->noContent();
     }
 }

@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->string('nome');
             $table->string('cpf', 11)->unique();
-            $table->string('email')->unique();
+            $table->string('email')->nullable()->unique();
             $table->string('telefone', 20)->nullable();
             $table->decimal('renda_mensal', 15, 2);
             $table->timestamps();
